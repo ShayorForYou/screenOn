@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- State is device-specific (saved timeout, active flag) and must never be restored elsewhere. -->
+<full-backup-content>
+    <exclude domain="sharedpref" path="." />
+</full-backup-content>

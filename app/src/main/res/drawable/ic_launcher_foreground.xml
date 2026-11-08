@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A single continuous infinity stroke in brushed champagne gold: the timeout that never ends. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:pathData="M54,54C48,46 42.5,42.5 37,42.5C30.6,42.5 26,47.6 26,54C26,60.4 30.6,65.5 37,65.5C42.5,65.5 48,62 54,54C60,46 65.5,42.5 71,42.5C77.4,42.5 82,47.6 82,54C82,60.4 77.4,65.5 71,65.5C65.5,65.5 60,62 54,54Z"
+        android:strokeWidth="5.5"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round">
+        <aapt:attr name="android:strokeColor">
+            <gradient
+                android:endX="82"
+                android:endY="65"
+                android:startX="26"
+                android:startY="43"
+                android:type="linear">
+                <item android:color="#FFF7E7C1" android:offset="0" />
+                <item android:color="#FFD9B56E" android:offset="0.45" />
+                <item android:color="#FFF3DDA6" android:offset="0.7" />
+                <item android:color="#FFB88E46" android:offset="1" />
+            </gradient>
+        </aapt:attr>
+    </path>
+</vector>

@@ -1,0 +1,43 @@
+<resources>
+    <string name="app_name">Screen On</string>
+    <string name="tile_label">Keep screen on</string>
+
+    <!-- Method names (selector + tile subtitle) -->
+    <string name="mode_timeout">Timeout</string>
+    <string name="mode_service">Wake lock</string>
+
+    <!-- Main screen -->
+    <string name="status_on">Staying awake</string>
+    <string name="status_off">Sleeping as usual</string>
+    <string name="hint_off">Tap the dial to keep your screen on</string>
+    <string name="hint_on_timeout">Back to %1$s when you turn it off</string>
+    <string name="hint_on_service">Until you turn it off</string>
+
+    <string name="desc_timeout">Sets the screen timeout to its maximum. Nothing runs in the background, and your own timeout comes back when you turn it off.</string>
+    <string name="desc_service">A tiny service holds the screen awake and leaves your timeout untouched. It pauses whenever the screen is off.</string>
+    <string name="grant_permission">Allow settings access</string>
+
+    <string name="add_tile">Add to Quick Settings</string>
+    <string name="dial_on">On</string>
+    <string name="dial_off">Off</string>
+    <string name="error_generic">Couldn\'t change the screen setting</string>
+
+    <!-- Notification -->
+    <string name="channel_name">Keep screen on</string>
+    <string name="notif_title">Screen stays on</string>
+    <string name="notif_text">Tap to open, or turn off here</string>
+    <string name="turn_off">Turn off</string>
+
+    <plurals name="seconds">
+        <item quantity="one">%d second</item>
+        <item quantity="other">%d seconds</item>
+    </plurals>
+    <plurals name="minutes">
+        <item quantity="one">%d minute</item>
+        <item quantity="other">%d minutes</item>
+    </plurals>
+    <plurals name="hours">
+        <item quantity="one">%d hour</item>
+        <item quantity="other">%d hours</item>
+    </plurals>
+</resources>

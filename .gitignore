@@ -1,0 +1,17 @@
+*.iml
+.gradle
+/local.properties
+local.properties
+/.idea
+.DS_Store
+/build
+/app/build
+/captures
+.externalNativeBuild
+.cxx
+.kotlin
+# APKs from Android Studio's "Generate Signed APK"; releases are built by CI instead.
+/app/release
+# Never commit signing keys.
+*.jks
+*.keystore

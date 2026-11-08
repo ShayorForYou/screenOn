@@ -1,0 +1,129 @@
+# Every push to main (except docs-only changes): unit tests, lint, then a signed universal APK (the app has no
+# native code, so one file runs on every phone).
+#
+# The release is tagged v<versionName> from app/build.gradle.kts. If that version hasn't been released yet, a GitHub
+# release is published, with text from .github/release-notes/v<version>.md when that file exists. If it already
+# exists, the signed APK is attached to the workflow run instead; bump versionName to publish a new release.
+#
+# Needs four repository secrets (Settings → Secrets and variables → Actions):
+#   KEYSTORE_BASE64    the release keystore, base64-encoded: base64 -i release.jks | pbcopy
+#   KEYSTORE_PASSWORD  its store password
+#   KEY_ALIAS          the key's alias
+#   KEY_PASSWORD       the key's password
+# Without them, tests and lint still run and signing is skipped with a warning.
+name: Build & Release
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - "**.md"
+      - "docs/**"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Read the app version
+        id: version
+        run: |
+          version=$(sed -nE 's/^[[:space:]]*versionName = "(.*)"/\1/p' app/build.gradle.kts)
+          test -n "$version" || { echo "::error::No versionName in app/build.gradle.kts"; exit 1; }
+          echo "tag=v$version" >> "$GITHUB_OUTPUT"
+          if gh release view "v$version" >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::Release v$version already exists; the APK will be attached to this run. Bump versionName to publish a new release."
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - name: Restore the signing key
+        id: key
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          for name in KEYSTORE_BASE64 KEYSTORE_PASSWORD KEY_ALIAS KEY_PASSWORD; do
+            if [ -z "${!name}" ]; then
+              echo "::warning::Repository secret $name is not set, so no signed APK is built. See the top of .github/workflows/release.yml."
+              echo "ready=false" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+          done
+          echo "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/release.jks"
+          echo "ready=true" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: gradle
+
+      - name: Test and lint
+        run: ./gradlew testDebugUnitTest lintDebug --no-daemon
+
+      - name: Build the signed APK
+        if: steps.key.outputs.ready == 'true'
+        env:
+          SIGNING_KEYSTORE_PATH: ${{ runner.temp }}/release.jks
+          SIGNING_STORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          SIGNING_KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          SIGNING_KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: ./gradlew assembleRelease --no-daemon
+
+      - name: Verify the signature and name the file
+        if: steps.key.outputs.ready == 'true'
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          apksigner="$(ls -d "$ANDROID_HOME"/build-tools/*/ | sort -V | tail -1)apksigner"
+          # An unsigned build is named app-release-unsigned.apk and so fails this check.
+          apk=app/build/outputs/apk/release/app-release.apk
+          test -f "$apk" || { echo "::error::No signed APK"; ls -l app/build/outputs/apk/release; exit 1; }
+          "$apksigner" verify "$apk"
+          mkdir dist
+          cp "$apk" "dist/screen-on-$TAG.apk"
+          (cd dist && sha256sum *.apk > SHA256SUMS.txt)
+          ls -l dist
+
+      - name: Publish the release
+        if: steps.key.outputs.ready == 'true' && steps.version.outputs.exists == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          notes=".github/release-notes/$TAG.md"
+          if [ -f "$notes" ]; then notes_arg=(--notes-file "$notes"); else notes_arg=(--generate-notes); fi
+          gh release create "$TAG" dist/* --target "$GITHUB_SHA" --title "Screen On $TAG" "${notes_arg[@]}"
+
+      - name: Attach the APK to this run
+        if: steps.key.outputs.ready == 'true' && steps.version.outputs.exists == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: screen-on-${{ steps.version.outputs.tag }}-${{ github.sha }}
+          path: dist/*
+
+      - name: Upload test and lint reports
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reports
+          path: app/build/reports
+
+      - name: Remove the signing key
+        if: always()
+        run: rm -f "$RUNNER_TEMP/release.jks"
