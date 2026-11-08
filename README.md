@@ -44,4 +44,4 @@ Get the latest APK from [Releases](../../releases). Requires Android 7.0 or newe
 
 Open the project in Android Studio, or run `./gradlew assembleDebug`.
 
-Every push to `main` is tested and built by GitHub Actions. When `versionName` in `app/build.gradle.kts` is new, a signed APK is published as a GitHub release. See [`.github/workflows/release.yml`](.github/workflows/release.yml).
+Development happens on `main`. Every push to `production` is tested and built by GitHub Actions. When `versionName` in `app/build.gradle.kts` is new, a signed APK is published as a GitHub release. See [`.github/workflows/release.yml`](.github/workflows/release.yml).

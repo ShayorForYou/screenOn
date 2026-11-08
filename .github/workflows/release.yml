@@ -1,4 +1,4 @@
-# Every push to main (except docs-only changes): unit tests, lint, then a signed universal APK (the app has no
+# Every push to production (except docs-only changes): unit tests, lint, then a signed universal APK (the app has no
 # native code, so one file runs on every phone).
 #
 # The release is tagged v<versionName> from app/build.gradle.kts. If that version hasn't been released yet, a GitHub
@@ -15,7 +15,7 @@ name: Build & Release
 
 on:
   push:
-    branches: [main]
+    branches: [production]
     paths-ignore:
       - "**.md"
       - "docs/**"
