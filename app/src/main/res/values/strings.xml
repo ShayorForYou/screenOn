@@ -12,10 +12,27 @@
     <string name="hint_off">Tap the dial to keep your screen on</string>
     <string name="hint_on_timeout">Back to %1$s when you turn it off</string>
     <string name="hint_on_service">Until you turn it off</string>
+    <string name="hint_on_timeout_timed">Until %1$s, then back to %2$s</string>
+    <string name="hint_on_service_timed">Until %1$s</string>
 
-    <string name="desc_timeout">Sets the screen timeout to its maximum. Nothing runs in the background, and your own timeout comes back when you turn it off.</string>
+    <string name="desc_timeout">Sets the screen timeout to its maximum. Nothing runs in the background, and your own timeout comes back when you turn it off or restart.</string>
     <string name="desc_service">A tiny service holds the screen awake and leaves your timeout untouched. It pauses whenever the screen is off.</string>
     <string name="grant_permission">Allow settings access</string>
+
+    <!-- Auto-off timer -->
+    <string name="duration_label">Keep on for</string>
+    <string name="duration_forever">Until turned off</string>
+    <string name="duration_min_short">%d min</string>
+    <string name="duration_hr_short">%d hr</string>
+    <string name="left_min">%d min left</string>
+    <string name="left_hr">%d hr left</string>
+    <string name="left_hr_min">%1$d hr %2$d min left</string>
+    <string name="precise_timer">Allow exact timing</string>
+    <string name="until_time">Until %s</string>
+
+    <!-- Battery guard -->
+    <string name="battery_guard_title">Turn off on low battery</string>
+    <string name="battery_guard_desc">At %1$d%% or below, unless charging</string>
 
     <string name="add_tile">Add to Quick Settings</string>
     <string name="dial_on">On</string>
@@ -26,6 +43,7 @@
     <string name="channel_name">Keep screen on</string>
     <string name="notif_title">Screen stays on</string>
     <string name="notif_text">Tap to open, or turn off here</string>
+    <string name="notif_text_timed">Turns off at %s</string>
     <string name="turn_off">Turn off</string>
 
     <plurals name="seconds">

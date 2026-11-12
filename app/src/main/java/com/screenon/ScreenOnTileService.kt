@@ -32,9 +32,13 @@ class ScreenOnTileService : TileService() {
         tile.state = if (s.active) Tile.STATE_ACTIVE else Tile.STATE_INACTIVE
         tile.label = getString(R.string.tile_label)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            tile.subtitle = getString(
-                if (s.mode == KeepAwake.Mode.TIMEOUT) R.string.mode_timeout else R.string.mode_service
-            )
+            tile.subtitle = if (s.active && s.endsAt != null) {
+                getString(R.string.until_time, KeepAwake.formatClock(this, s.endsAt))
+            } else {
+                getString(
+                    if (s.mode == KeepAwake.Mode.TIMEOUT) R.string.mode_timeout else R.string.mode_service
+                )
+            }
         }
         tile.updateTile()
     }

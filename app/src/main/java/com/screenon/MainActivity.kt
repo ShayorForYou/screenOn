@@ -44,7 +44,11 @@ class MainActivity : ComponentActivity() {
                     state = state,
                     onToggle = ::toggle,
                     onModeChange = { handle(KeepAwake.setMode(this, it)) },
+                    onDurationChange = { KeepAwake.setDuration(this, it) },
+                    onBatteryGuardChange = { KeepAwake.setBatteryGuard(this, it) },
                     onGrant = ::requestWriteSettings,
+                    onPreciseTimer = ::requestExactAlarms,
+                    onExpire = { KeepAwake.refresh(this) },
                     onAddTile = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) ::addTile else null,
                 )
             }
@@ -60,6 +64,8 @@ class MainActivity : ComponentActivity() {
         super.onResume()
         // Picks up anything that changed while we were away (timeout edited in Settings, etc.).
         val s = KeepAwake.refresh(this)
+        // Re-arms the timer, e.g. as an exact alarm once that access was just granted.
+        KeepAwake.schedule(this)
         if (enableAfterGrant) {
             enableAfterGrant = false
             if (s.canWriteSettings && !s.active) handle(KeepAwake.enable(this, Mode.TIMEOUT))
@@ -111,6 +117,15 @@ class MainActivity : ComponentActivity() {
             startActivity(KeepAwake.writeSettingsIntent(this))
         } catch (_: Exception) {
             enableAfterGrant = false
+            Toast.makeText(this, R.string.error_generic, Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun requestExactAlarms() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return
+        try {
+            startActivity(KeepAwake.exactAlarmIntent(this))
+        } catch (_: Exception) {
             Toast.makeText(this, R.string.error_generic, Toast.LENGTH_SHORT).show()
         }
     }

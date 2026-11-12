@@ -12,7 +12,9 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.ServiceInfo
 import android.os.Build
+import android.os.Handler
 import android.os.IBinder
+import android.os.Looper
 import android.os.PowerManager
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
@@ -30,10 +32,26 @@ class ScreenOnService : Service() {
         override fun onReceive(context: Context, intent: Intent) {
             when (intent.action) {
                 Intent.ACTION_SCREEN_OFF -> release()
-                Intent.ACTION_SCREEN_ON -> acquire()
+                Intent.ACTION_SCREEN_ON -> {
+                    acquire()
+                    // Catches a timer that ran out while the screen was off.
+                    KeepAwake.refresh(context)
+                }
             }
         }
     }
+
+    /** Ends the session at low battery; the reading itself happens in [KeepAwake.refresh]. */
+    private val batteryReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            if (KeepAwake.state.value.batteryGuard) KeepAwake.refresh(context)
+        }
+    }
+
+    // While the screen is on the CPU is awake, so a plain handler ends the session to the second
+    // without needing exact-alarm access. (The alarm from KeepAwake.schedule is the backup.)
+    private val handler = Handler(Looper.getMainLooper())
+    private val expire = Runnable { KeepAwake.refresh(this) }
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -47,6 +65,12 @@ class ScreenOnService : Service() {
                 addAction(Intent.ACTION_SCREEN_OFF)
                 addAction(Intent.ACTION_SCREEN_ON)
             },
+            ContextCompat.RECEIVER_NOT_EXPORTED,
+        )
+        ContextCompat.registerReceiver(
+            this,
+            batteryReceiver,
+            IntentFilter(Intent.ACTION_BATTERY_CHANGED),
             ContextCompat.RECEIVER_NOT_EXPORTED,
         )
     }
@@ -63,14 +87,20 @@ class ScreenOnService : Service() {
             return START_NOT_STICKY
         }
         if (getSystemService(PowerManager::class.java).isInteractive) acquire()
+        handler.removeCallbacks(expire)
+        KeepAwake.endsAt(this)?.let { end ->
+            handler.postDelayed(expire, (end - System.currentTimeMillis()).coerceAtLeast(0L) + 250L)
+        }
         // If the system kills us under memory pressure, come back and keep working.
         return START_STICKY
     }
 
     override fun onDestroy() {
         running = false
+        handler.removeCallbacks(expire)
         release()
         unregisterReceiver(screenReceiver)
+        unregisterReceiver(batteryReceiver)
         KeepAwake.onServiceGone(this)
         super.onDestroy()
     }
@@ -110,15 +140,26 @@ class ScreenOnService : Service() {
         val stop = PendingIntent.getService(
             this, 1, Intent(this, ScreenOnService::class.java).setAction(ACTION_STOP), immutable
         )
+        val endsAt = KeepAwake.endsAt(this)
         val notification = NotificationCompat.Builder(this, CHANNEL)
             .setSmallIcon(R.drawable.ic_screen_on)
             .setContentTitle(getString(R.string.notif_title))
-            .setContentText(getString(R.string.notif_text))
+            .setContentText(
+                if (endsAt != null) getString(R.string.notif_text_timed, KeepAwake.formatClock(this, endsAt))
+                else getString(R.string.notif_text)
+            )
             .setContentIntent(open)
             .addAction(0, getString(R.string.turn_off), stop)
             .setOngoing(true)
             .setSilent(true)
-            .setShowWhen(false)
+            .apply {
+                // A live countdown in the header, drawn by the system: no updates from us.
+                if (endsAt != null) {
+                    setWhen(endsAt).setShowWhen(true).setUsesChronometer(true).setChronometerCountDown(true)
+                } else {
+                    setShowWhen(false)
+                }
+            }
             .setCategory(NotificationCompat.CATEGORY_SERVICE)
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
@@ -137,6 +178,16 @@ class ScreenOnService : Service() {
 
         @Volatile
         private var running = false
+
+        /** Rebuilds the notification and timer after the session length changed. */
+        fun update(c: Context) {
+            if (!running) return
+            try {
+                c.startService(Intent(c, ScreenOnService::class.java))
+            } catch (_: IllegalStateException) {
+                // Not allowed from the background; the old timer still ends via the alarm.
+            }
+        }
 
         /** True if alive in this process, or known to the system (incl. pending sticky restart). */
         fun isRunning(c: Context): Boolean {
