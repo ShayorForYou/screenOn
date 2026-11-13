@@ -11,6 +11,8 @@
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+
+    <!-- Both modes: the status (when it turns off) and the still-on reminder. Optional. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <!-- A restart always turns it off and gives your own timeout back. -->

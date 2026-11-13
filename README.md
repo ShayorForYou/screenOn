@@ -14,6 +14,8 @@ Keep your Android screen awake for as long as you need, from the app or a Quick 
 
 - **Tap the dial.** One tap keeps the screen on and another lets it sleep again. While it's on, the gold ticks around the dial show the time remaining.
 - **Auto-off timer.** Under **Keep on for**, pick 15 min, 30 min, 1 hr, 2 hr, or ∞ (until you turn it off). The app shows when it will turn off, for example *"Until 5:18 PM, then back to 30 seconds"*. Picking a different length while it's on restarts the timer from now.
+- **Always visible.** In both modes a quiet notification shows that the screen is being kept on, counts down to when it turns off, and has a **Turn off** button.
+- **Still-on reminder.** With ∞ picked, a reminder comes every 2 hours so a forgotten session doesn't drain your battery. It rides on the app's existing alarm, so it never wakes the phone. You can mute it under *Still-on reminders* in the app's notification settings.
 - **Turn off on low battery.** On by default. It turns itself off at 15% unless the phone is charging.
 - **Restarts are handled.** A restart always counts as off, and your own timeout is restored as soon as the phone starts. This also works on phones that block apps from starting at boot.
 - **Your timeout, untouched.** Screen On saves the exact timeout you had and puts it back. If you change the timeout yourself while it's on, it keeps your new choice.
@@ -24,17 +26,17 @@ Keep your Android screen awake for as long as you need, from the app or a Quick 
 | Method | How it works | Background cost |
 |---|---|---|
 | **Timeout** | Raises the system screen timeout to its maximum, then puts your own timeout back when it turns off. | None. Nothing runs. |
-| **Wake lock** | A tiny foreground service holds the screen awake and leaves your timeout alone. It releases the lock whenever the screen is off, and its notification counts down when a timer is set. | A small service while on |
+| **Wake lock** | A tiny foreground service holds the screen awake and leaves your timeout alone. It releases the lock whenever the screen is off. | A small service while on |
 
 <p align="center">
-  <img src="docs/images/notification.png" width="420" alt="Wake lock notification with a countdown: Turns off at 5:40 PM" />
+  <img src="docs/images/notification.png" width="420" alt="Screen On notification with a countdown: Turns off at 5:40 PM" />
 </p>
 
 ### Permissions
 
 - **Modify system settings** (Timeout mode). The app opens the right settings screen the first time you use it.
 - **Alarms & reminders** (optional, Android 12+). This lets the timer end on the minute in Timeout mode. If it's missing, an **Allow exact timing** link appears and the timer may end a few minutes late. Wake lock mode doesn't need it.
-- **Notifications** (Wake lock mode). Used for the ongoing notification with its **Turn off** button.
+- **Notifications** (optional, Android 13+). Asked once, the first time you turn it on. Used for the status notification and the still-on reminder. Both modes work without it.
 
 ## Quick Settings tile
 

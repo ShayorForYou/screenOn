@@ -46,6 +46,12 @@
     <string name="notif_text_timed">Turns off at %s</string>
     <string name="turn_off">Turn off</string>
 
+    <!-- Reminder for a session without a timer -->
+    <string name="channel_reminder">Still-on reminders</string>
+    <string name="channel_reminder_desc">A nudge every 2 hours while the screen is kept on with no timer</string>
+    <string name="reminder_title">Your screen is still kept on</string>
+    <string name="reminder_text">On for %s with no timer. Turn it off if you\'re done.</string>
+
     <plurals name="seconds">
         <item quantity="one">%d second</item>
         <item quantity="other">%d seconds</item>
@@ -57,5 +63,9 @@
     <plurals name="hours">
         <item quantity="one">%d hour</item>
         <item quantity="other">%d hours</item>
+    </plurals>
+    <plurals name="days">
+        <item quantity="one">%d day</item>
+        <item quantity="other">%d days</item>
     </plurals>
 </resources>

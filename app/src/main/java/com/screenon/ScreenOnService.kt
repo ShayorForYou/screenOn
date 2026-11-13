@@ -2,9 +2,6 @@ package com.screenon
 
 import android.annotation.SuppressLint
 import android.app.ActivityManager
-import android.app.NotificationChannel
-import android.app.NotificationManager
-import android.app.PendingIntent
 import android.app.Service
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -16,7 +13,6 @@ import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
 import android.os.PowerManager
-import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 
 /**
@@ -76,10 +72,6 @@ class ScreenOnService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        if (intent?.action == ACTION_STOP) {
-            KeepAwake.disable(this) // clears state and stops this service
-            return START_NOT_STICKY
-        }
         // Must always be called promptly after startForegroundService(), even if we stop right after.
         goForeground()
         if (!KeepAwake.isServiceModeActive(this)) {
@@ -123,58 +115,15 @@ class ScreenOnService : Service() {
     }
 
     private fun goForeground() {
-        val nm = getSystemService(NotificationManager::class.java)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O &&
-            nm.getNotificationChannel(CHANNEL) == null
-        ) {
-            nm.createNotificationChannel(
-                NotificationChannel(
-                    CHANNEL, getString(R.string.channel_name), NotificationManager.IMPORTANCE_LOW
-                ).apply { setShowBadge(false) }
-            )
-        }
-        val immutable = PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
-        val open = PendingIntent.getActivity(
-            this, 0, Intent(this, MainActivity::class.java), immutable
-        )
-        val stop = PendingIntent.getService(
-            this, 1, Intent(this, ScreenOnService::class.java).setAction(ACTION_STOP), immutable
-        )
-        val endsAt = KeepAwake.endsAt(this)
-        val notification = NotificationCompat.Builder(this, CHANNEL)
-            .setSmallIcon(R.drawable.ic_screen_on)
-            .setContentTitle(getString(R.string.notif_title))
-            .setContentText(
-                if (endsAt != null) getString(R.string.notif_text_timed, KeepAwake.formatClock(this, endsAt))
-                else getString(R.string.notif_text)
-            )
-            .setContentIntent(open)
-            .addAction(0, getString(R.string.turn_off), stop)
-            .setOngoing(true)
-            .setSilent(true)
-            .apply {
-                // A live countdown in the header, drawn by the system: no updates from us.
-                if (endsAt != null) {
-                    setWhen(endsAt).setShowWhen(true).setUsesChronometer(true).setChronometerCountDown(true)
-                } else {
-                    setShowWhen(false)
-                }
-            }
-            .setCategory(NotificationCompat.CATEGORY_SERVICE)
-            .setPriority(NotificationCompat.PRIORITY_LOW)
-            .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
-            .build()
+        val notification = Notifications.status(this, KeepAwake.endsAt(this))
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-            startForeground(NOTIF_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
+            startForeground(Notifications.ID_SERVICE, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
         } else {
-            startForeground(NOTIF_ID, notification)
+            startForeground(Notifications.ID_SERVICE, notification)
         }
     }
 
     companion object {
-        private const val CHANNEL = "keep_awake"
-        private const val NOTIF_ID = 1
-        private const val ACTION_STOP = "com.screenon.STOP"
 
         @Volatile
         private var running = false

@@ -75,6 +75,8 @@ object KeepAwake {
     private const val K_END = "session_end"
     private const val K_ARMED = "battery_armed"
     private const val K_BOOT = "session_boot"
+    private const val K_SINCE = "session_since"
+    private const val K_REMIND = "remind_at"
 
     /** Largest value the setting accepts; on most devices this means "never". */
     private const val MAX_TIMEOUT = Int.MAX_VALUE
@@ -87,6 +89,16 @@ object KeepAwake {
 
     /** Delivery window for inexact alarms (the system may widen it). */
     private const val ALARM_WINDOW_MS = 60_000L
+
+    /**
+     * How often a session without a timer reminds that it is still on. Longer than the longest
+     * timer on offer, so it only speaks up once a session has clearly outlasted any planned use.
+     */
+    private const val REMINDER_MS = 2 * 60 * 60_000L
+
+    /** Whether this process has brought the notifications in line with the state yet. */
+    @Volatile
+    private var notificationsSynced = false
 
     private val _state = MutableStateFlow(
         State(false, Mode.TIMEOUT, null, false, false, 0, null, null, true, true)
@@ -196,10 +208,26 @@ object KeepAwake {
         publish(c)
     }
 
+    /** The alarm went off: end the session if it is due, else remind if that is due, then re-arm. */
+    fun onAlarm(c: Context) {
+        reconcile(c) // ends the session if its time is up or the battery is low
+        val p = prefs(c)
+        val remindAt = p.getLong(K_REMIND, 0L)
+        val now = System.currentTimeMillis()
+        if (p.getString(K_ACTIVE, null) != null && remindAt in 1L..now) {
+            // Counted from now, so a phone left asleep overnight gets one reminder, not a backlog.
+            p.edit { putLong(K_REMIND, now + REMINDER_MS) }
+            Notifications.remind(c, p.getLong(K_SINCE, remindAt - REMINDER_MS))
+        }
+        publish(c)
+        schedule(c)
+    }
+
     /**
-     * Arms (or cancels) the single alarm that ends the session on time and, in timeout mode, looks
-     * at the battery now and then. The alarm never wakes the device: while the screen is off nothing
-     * needs to happen, and a pending alarm is delivered as soon as it comes back on.
+     * Arms (or cancels) the single alarm that ends the session on time, reminds about a session
+     * without a timer and, in timeout mode, looks at the battery now and then. The alarm never wakes
+     * the device: while the screen is off nothing needs to happen, and a pending alarm is delivered
+     * as soon as it comes back on.
      */
     fun schedule(c: Context) {
         val p = prefs(c)
@@ -207,11 +235,12 @@ object KeepAwake {
         val pi = alarmIntent(c)
         val active = p.getString(K_ACTIVE, null)
         val end = p.getLong(K_END, 0L).takeIf { active != null && it > 0L }
+        val remind = p.getLong(K_REMIND, 0L).takeIf { active != null && it > 0L }
         // Wake lock mode watches the battery from its service; timeout mode has nothing running.
         val check = if (active == Mode.TIMEOUT.name && p.getBoolean(K_GUARD, true)) {
             System.currentTimeMillis() + BATTERY_CHECK_MS
         } else null
-        val at = listOfNotNull(end, check).minOrNull()
+        val at = listOfNotNull(end, remind, check).minOrNull()
         if (at == null) {
             am.cancel(pi)
             return
@@ -312,17 +341,21 @@ object KeepAwake {
     private fun SharedPreferences.Editor.putSession(c: Context, p: SharedPreferences) {
         putInt(K_BOOT, bootCount(c))
         putBoolean(K_ARMED, battery(c)?.let { it.level > BATTERY_THRESHOLD } ?: true)
+        putLong(K_SINCE, System.currentTimeMillis())
         putTimer(p.getInt(K_DURATION, 0))
     }
 
+    /** A timer ends the session; without one, a reminder comes round every [REMINDER_MS]. */
     private fun SharedPreferences.Editor.putTimer(minutes: Int) {
+        val now = System.currentTimeMillis()
         if (minutes > 0) {
-            val now = System.currentTimeMillis()
             putLong(K_START, now)
             putLong(K_END, now + minutes * 60_000L)
+            remove(K_REMIND)
         } else {
             remove(K_START)
             remove(K_END)
+            putLong(K_REMIND, now + REMINDER_MS)
         }
     }
 
@@ -389,6 +422,15 @@ object KeepAwake {
         }
         // Covers a restart even when the boot broadcast never arrives (some OEMs block it).
         if (p.getString(K_ACTIVE, null) != null && shouldEnd(c, p)) endSession(c, p)
+        // A session without a timer that has no reminder yet (adopted above, or started by an
+        // older version): count from now.
+        if (p.getString(K_ACTIVE, null) != null && !p.contains(K_END) && !p.contains(K_REMIND)) {
+            val now = System.currentTimeMillis()
+            p.edit {
+                if (!p.contains(K_SINCE)) putLong(K_SINCE, now)
+                putLong(K_REMIND, now + REMINDER_MS)
+            }
+        }
     }
 
     private fun clearActive(c: Context, p: SharedPreferences) {
@@ -400,6 +442,8 @@ object KeepAwake {
             remove(K_END)
             remove(K_ARMED)
             remove(K_BOOT)
+            remove(K_SINCE)
+            remove(K_REMIND)
         }
         c.getSystemService(AlarmManager::class.java)?.cancel(alarmIntent(c))
     }
@@ -422,9 +466,13 @@ object KeepAwake {
         )
         val old = _state.value
         _state.value = new
-        if (notifyTile &&
-            (old.active != new.active || old.mode != new.mode || old.endsAt != new.endsAt)
-        ) {
+        val changed = old.active != new.active || old.mode != new.mode || old.endsAt != new.endsAt
+        // Only on change (and once per process), so frequent refreshes never re-post anything.
+        if (changed || !notificationsSynced) {
+            notificationsSynced = true
+            Notifications.sync(c, new)
+        }
+        if (notifyTile && changed) {
             try {
                 TileService.requestListeningState(
                     c, ComponentName(c, ScreenOnTileService::class.java)

@@ -5,11 +5,18 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 
-/** Fires when the timer runs out, or for timeout mode's periodic battery look. */
+/**
+ * The app's single alarm (timer end, timeout mode's battery look, "still on" reminder) and the
+ * notifications' Turn off button.
+ */
 class AutoOffReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
-        KeepAwake.refresh(context) // ends the session if its time is up or the battery is low
-        KeepAwake.schedule(context)
+        if (intent.action == ACTION_TURN_OFF) KeepAwake.disable(context)
+        else KeepAwake.onAlarm(context)
+    }
+
+    companion object {
+        const val ACTION_TURN_OFF = "com.screenon.TURN_OFF"
     }
 }
 

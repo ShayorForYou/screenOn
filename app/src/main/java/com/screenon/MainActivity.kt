@@ -16,6 +16,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.core.content.ContextCompat
+import androidx.core.content.edit
 import com.screenon.KeepAwake.Mode
 import com.screenon.KeepAwake.Result
 import com.screenon.ui.ScreenOnScreen
@@ -28,8 +29,9 @@ class MainActivity : ComponentActivity() {
 
     private val notificationPermission =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) {
-            // Service works either way; the notification is just hidden if denied.
-            handle(KeepAwake.enable(this, Mode.SERVICE))
+            // Both modes work either way; the status and reminder are just hidden if denied. The
+            // mode to turn on was saved before asking, so it survives the activity being recreated.
+            handle(KeepAwake.enable(this, KeepAwake.state.value.mode))
         }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -68,7 +70,7 @@ class MainActivity : ComponentActivity() {
         KeepAwake.schedule(this)
         if (enableAfterGrant) {
             enableAfterGrant = false
-            if (s.canWriteSettings && !s.active) handle(KeepAwake.enable(this, Mode.TIMEOUT))
+            if (s.canWriteSettings && !s.active) enable(Mode.TIMEOUT)
         }
     }
 
@@ -76,7 +78,7 @@ class MainActivity : ComponentActivity() {
         when (intent?.action) {
             ACTION_ENABLE_SERVICE -> enable(Mode.SERVICE)
             ACTION_GRANT_AND_ENABLE -> {
-                if (KeepAwake.canWriteSettings(this)) handle(KeepAwake.enable(this, Mode.TIMEOUT))
+                if (KeepAwake.canWriteSettings(this)) enable(Mode.TIMEOUT)
                 else requestWriteSettings(enableAfter = true)
             }
         }
@@ -88,15 +90,30 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun enable(mode: Mode) {
-        if (mode == Mode.SERVICE && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
-            ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
-            != PackageManager.PERMISSION_GRANTED
-        ) {
+        // Timeout mode first needs settings access; ask for that before anything else.
+        if (mode == Mode.TIMEOUT && !KeepAwake.canWriteSettings(this)) {
+            handle(KeepAwake.enable(this, mode))
+            return
+        }
+        if (shouldAskForNotifications()) {
+            KeepAwake.setMode(this, mode) // read back when the answer comes in
+            getPreferences(MODE_PRIVATE).edit { putBoolean(K_ASKED_NOTIFICATIONS, true) }
             notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
             return
         }
         handle(KeepAwake.enable(this, mode))
     }
+
+    /**
+     * Asked once, the first time either mode is turned on: the status shows when the screen will
+     * sleep again and the reminder catches a forgotten session. A "no" is respected; it can still
+     * be changed in the system's app settings.
+     */
+    private fun shouldAskForNotifications(): Boolean =
+        Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) !=
+            PackageManager.PERMISSION_GRANTED &&
+            !getPreferences(MODE_PRIVATE).getBoolean(K_ASKED_NOTIFICATIONS, false)
 
     private fun handle(result: Result) {
         when (result) {
@@ -149,5 +166,6 @@ class MainActivity : ComponentActivity() {
     companion object {
         const val ACTION_ENABLE_SERVICE = "com.screenon.ENABLE_SERVICE"
         const val ACTION_GRANT_AND_ENABLE = "com.screenon.GRANT_AND_ENABLE"
+        private const val K_ASKED_NOTIFICATIONS = "asked_notifications"
     }
 }
